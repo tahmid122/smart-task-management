@@ -1,8 +1,12 @@
 import React, { useState } from "react";
 import toast from "react-hot-toast";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
+import useAxios from "../../Hooks/useAxios";
 
 const SignUp = () => {
+  const { axiosInstance } = useAxios();
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
   const [credential, setCredential] = useState({
     fullName: "",
     email: "",
@@ -17,12 +21,32 @@ const SignUp = () => {
     setCredential({ ...credential, [name]: value });
   };
   // handle submit
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
+    setIsLoading(true);
     e.preventDefault();
     if (credential.confirmPassword !== credential.password) {
       return toast.error("Confirm Password not matched");
     }
-    console.log(credential);
+    try {
+      const res = await axiosInstance.post("/sign-up", {
+        fullName: credential?.fullName,
+        email: credential?.email,
+        password: credential?.password,
+      });
+      if (res?.data) {
+        if (res?.data?.success) {
+          toast.success(res?.data?.message);
+          navigate("/");
+        } else {
+          toast.error(res?.data?.message);
+          if (res?.data?.error) console.log(res?.data?.error);
+        }
+      }
+    } catch (error) {
+      console.log(error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
   return (
     <div className="h-screen w-full flex items-center justify-center bg-slate-100">
@@ -116,9 +140,14 @@ const SignUp = () => {
             <div>
               <button
                 type="submit"
+                disabled={isLoading}
                 className="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
               >
-                Sign Up
+                {isLoading ? (
+                  <span class="loading loading-spinner loading-sm"></span>
+                ) : (
+                  " Sign Up"
+                )}
               </button>
             </div>
           </form>
