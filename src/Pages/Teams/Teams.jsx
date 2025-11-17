@@ -6,7 +6,7 @@ const Teams = () => {
   return (
     <div>
       {/* top */}
-      <div className="flex items-center justify-between border-b border-b-slate-200 pb-4 mb-10">
+      <div className="flex items-center flex-col gap-3 lg:flex-row justify-between border-b border-b-slate-200 pb-4 mb-10">
         <h2 className="text-2xl font-semibold">All Teams</h2>
         <div className="flex items-center gap-3">
           <div>
