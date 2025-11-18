@@ -1,7 +1,59 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import useTeams from "../../Hooks/useTeams";
+import { getFormData } from "../../utils/getFormData";
+import useAuth from "../../Hooks/useAuth";
+import useAxiosSecure from "../../Hooks/useAxiosSecure";
+import toast from "react-hot-toast";
 
 const Projects = () => {
+  const { user } = useAuth();
   const [showProjects, setProjectsShow] = useState(false);
+  const { allTeams } = useTeams();
+  const [allProjects, setAllProjects] = useState([]);
+  const { axiosSecure } = useAxiosSecure();
+  const [isLoading, setIsLoading] = useState(false);
+  // create project
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    const data = getFormData(e.target);
+    const project = {
+      name: data?.projectName,
+      team: data?.assignTeam,
+      createdBy: user.email,
+    };
+    try {
+      setIsLoading(true);
+      const { data } = await axiosSecure.post("/create-project", project);
+      if (data?.success) {
+        toast.success(data?.message);
+        getAllProjects();
+      } else {
+        toast.error(data?.message);
+        if (data?.error) console.log(data?.error);
+      }
+    } catch (error) {
+      console.log(error.message);
+    } finally {
+      setIsLoading(false);
+      e.target.reset();
+    }
+  };
+  // get all projects
+  const getAllProjects = useCallback(async () => {
+    try {
+      const { data } = await axiosSecure(`/projects/${user.email}`);
+      if (data?.success) {
+        setAllProjects(data?.data ?? []);
+      } else {
+        console.log(data?.message);
+      }
+    } catch (error) {
+      console.log(error.message);
+    }
+  }, [axiosSecure, user.email]);
+  useEffect(() => {
+    getAllProjects();
+  }, [getAllProjects]);
   return (
     <div>
       {/* top */}
@@ -24,7 +76,10 @@ const Projects = () => {
       {/* modal for create projects*/}
       {showProjects && (
         <div className="flex items-center justify-center">
-          <form className="w-[400px] shadow-md rounded-md p-5 border border-slate-200 space-y-2">
+          <form
+            onSubmit={handleCreateProject}
+            className="w-[400px] shadow-md rounded-md p-5 border border-slate-200 space-y-2"
+          >
             <h3 className="text-center text-xl font-semibold">
               Create Project
             </h3>
@@ -56,13 +111,24 @@ const Projects = () => {
                   <option value="" className="hidden">
                     --Select Team--
                   </option>
-                  <option value="alpha">Alpha Team</option>
-                  <option value="beta">Beta Team</option>
+                  {allTeams &&
+                    allTeams?.length > 0 &&
+                    allTeams?.map((team) => (
+                      <option key={team?._id} value={team?.teamName}>
+                        {team?.teamName}
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>
             <div className="mt-2">
-              <button className="action-btn">Add Member</button>
+              <button disabled={isLoading} className="action-btn">
+                {isLoading ? (
+                  <span class="loading loading-spinner loading-sm"></span>
+                ) : (
+                  "Create Project"
+                )}
+              </button>
             </div>
           </form>
         </div>
@@ -84,11 +150,21 @@ const Projects = () => {
               </thead>
               <tbody>
                 {/* row 1 */}
-                <tr>
-                  <td>UI/UX Creation</td>
-                  <td>Alpha Team</td>
-                  <td>11/11/2025</td>
-                </tr>
+                {allProjects && allProjects?.length > 0 ? (
+                  allProjects.map((project) => (
+                    <tr key={project?._id}>
+                      <td>{project?.name}</td>
+                      <td>{project?.team}</td>
+                      <td>{project?.createdAt?.split("T")[0]}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={12} className="text-center">
+                      0 project found
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
