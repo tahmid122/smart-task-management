@@ -1,8 +1,23 @@
 import React, { useState } from "react";
+import useAxiosSecure from "../../Hooks/useAxiosSecure";
 
 const Teams = () => {
+  const { axiosSecure } = useAxiosSecure();
   const [showCreateTeam, setCreateTeam] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
+  const [team, setTeam] = useState({ teamName: "" });
+  // create team
+  const createTeam = async (e) => {
+    e.preventDefault();
+    try {
+      const { data } = await axiosSecure.post("/create-team", {
+        teamName: team?.teamName,
+      });
+      console.log(data);
+    } catch (error) {
+      console.log(error.message);
+    }
+  };
   return (
     <div>
       {/* top */}
@@ -36,7 +51,10 @@ const Teams = () => {
       {/* modal for create team*/}
       {showCreateTeam && (
         <div className="flex items-center justify-center">
-          <form className="w-[400px] shadow-md rounded-md p-5 border border-slate-200 space-y-2">
+          <form
+            onSubmit={createTeam}
+            className="w-[400px] shadow-md rounded-md p-5 border border-slate-200 space-y-2"
+          >
             <h3 className="text-center text-xl font-semibold">Create Team</h3>
             <div>
               <label htmlFor="teamName" className="font-semibold">
@@ -46,6 +64,10 @@ const Teams = () => {
                 <input
                   type="text"
                   name="teamName"
+                  value={team?.teamName}
+                  onChange={(e) =>
+                    setTeam({ ...team, teamName: e.target.value })
+                  }
                   required
                   placeholder="Enter team name"
                   className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
