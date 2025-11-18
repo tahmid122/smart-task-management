@@ -2,9 +2,11 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import useAxios from "../../Hooks/useAxios";
 import toast from "react-hot-toast";
+import useAuth from "../../Hooks/useAuth";
 
 const Login = () => {
   const { axiosInstance } = useAxios();
+  const { setUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const [credential, setCredential] = useState({ email: "", password: "" });
@@ -28,6 +30,7 @@ const Login = () => {
         if (res?.data?.success) {
           toast.success(res?.data?.message);
           localStorage.setItem("token", res.data?.token);
+          setUser(res?.data?.data);
           navigate("/dashboard");
         } else {
           toast.error(res?.data?.message);

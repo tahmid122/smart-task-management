@@ -11,6 +11,7 @@ import TeamSummary from "../Pages/TeamSummary/TeamSummary";
 import RecentReAssignments from "../Pages/RecentReAssignments/RecentReAssignments";
 import ActivityLog from "../Pages/ActivityLog/ActivityLog";
 import Dashboard from "../Pages/Dashboard/Dashboard";
+import ProtectedRoute from "../Routes/ProtectedRoute";
 
 export const router = createBrowserRouter([
   {
@@ -29,7 +30,11 @@ export const router = createBrowserRouter([
   },
   {
     path: "/dashboard",
-    Component: DashboardLayout,
+    element: (
+      <ProtectedRoute>
+        <DashboardLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,

@@ -10,7 +10,7 @@ import AuthContextProvider from "./Contexts/Authentication/AuthContextProvider.j
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <AuthContextProvider>
-      <RouterProvider router={router} />
+      <RouterProvider router={router}></RouterProvider>
       <Toaster position="top-center" reverseOrder={false} />
     </AuthContextProvider>
   </StrictMode>
