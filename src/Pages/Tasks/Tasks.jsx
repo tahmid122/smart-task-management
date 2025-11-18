@@ -2,10 +2,22 @@ import React, { useState } from "react";
 import { FaTrash, FaXmark } from "react-icons/fa6";
 import TaskCard from "./TaskCard";
 import Swal from "sweetalert2";
+import useProjects from "../../Hooks/useProjects";
+import useAxiosSecure from "../../Hooks/useAxiosSecure";
+import { getFormData } from "../../utils/getFormData";
+import toast from "react-hot-toast";
 
 const Tasks = () => {
+  const { axiosSecure } = useAxiosSecure();
+  const [isLoading, setIsLoading] = useState(false);
   const [taskShow, setTaskShow] = useState(false);
+  const [selectedMember, setSelectedMember] = useState({});
+  const [dataFrom, setDataForm] = useState({});
+  const [event, setEvent] = useState(null);
   const [isWarning, setIsWarning] = useState(false);
+  const [targetTeam, setTargetTeam] = useState("");
+  const [targetMembers, setTargetMembers] = useState([]);
+  const { allProjects } = useProjects();
   const [selectedTask, setSelectedTask] = useState({
     taskTitle: "",
     taskPriority: "",
@@ -28,6 +40,73 @@ const Tasks = () => {
         });
       }
     });
+  };
+  const handleGetTeam = (projectName) => {
+    const filter = allProjects.find((project) => project.name === projectName);
+    setTargetTeam(filter?.team);
+    getMembers(filter?.team);
+  };
+
+  const getMembers = async (teamName) => {
+    try {
+      const { data } = await axiosSecure.get(`/members/${teamName}`);
+      if (data?.success) {
+        setTargetMembers(data?.data);
+      }
+    } catch (error) {
+      console.log(error.message);
+    }
+  };
+  // get selected member
+  const getSelectedMember = (name) => {
+    setSelectedMember(targetMembers.find((member) => member.name === name));
+  };
+  // add task
+  const handleAddTask = async (e) => {
+    e.preventDefault();
+    const formData = getFormData(e.target);
+    setDataForm(formData);
+    setEvent(e);
+    if (formData.assignMember !== "Unassigned") {
+      if (selectedMember.currentTask > selectedMember.capacity) {
+        setIsWarning(true);
+        return;
+      }
+    }
+    addTask(formData);
+    e.target.reset();
+    setTargetTeam("");
+    setTargetMembers([]);
+  };
+  const addTask = async (formData) => {
+    try {
+      setIsLoading(true);
+      const { data } = await axiosSecure.post("/add-task", formData);
+      if (data?.success) {
+        toast.success(data?.message);
+      } else {
+        toast.error(data?.error);
+      }
+    } catch (error) {
+      console.log(error.message);
+    } finally {
+      setIsLoading(false);
+      setIsWarning(false);
+      setSelectedMember({});
+      event.target.reset();
+      setTargetTeam("");
+      setTargetMembers([]);
+    }
+  };
+  // auto assign
+  const handleAutoAssign = () => {
+    const arr = targetMembers.map((member) => {
+      member.total = member.capacity - member.currentTask;
+      return member;
+    });
+    const sortArray = arr.sort((a, b) => b.total - a.total);
+    const leastLoad = sortArray[0]["name"];
+    addTask({ ...dataFrom, assignMember: leastLoad });
   };
   return (
     <div>
@@ -54,7 +133,10 @@ const Tasks = () => {
       {/* modal for create projects*/}
       {taskShow && (
         <div className="flex items-center justify-center">
-          <form className="w-[400px] shadow-md rounded-md p-5 border border-slate-200 space-y-2">
+          <form
+            onSubmit={handleAddTask}
+            className="w-[400px] shadow-md rounded-md p-5 border border-slate-200 space-y-2"
+          >
             <h3 className="text-center text-xl font-semibold">Add Task</h3>
             <div>
               <label htmlFor="project" className="font-semibold">
@@ -63,13 +145,21 @@ const Tasks = () => {
               <div className="mt-2">
                 <select
                   name="project"
+                  onChange={(e) => handleGetTeam(e.target.value)}
                   required
                   className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
                 >
                   <option value="" className="hidden">
                     --Select project--
                   </option>
-                  <option value="ui/ux creation">UI/UX Creation</option>
+                  {}
+                  {allProjects &&
+                    allProjects?.length > 0 &&
+                    allProjects?.map((project) => (
+                      <option key={project?._id} value={project?.name}>
+                        {project?.name}
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>
@@ -81,6 +171,7 @@ const Tasks = () => {
                 <input
                   type="text"
                   name="assignTeam"
+                  value={targetTeam}
                   readOnly
                   placeholder="Select project to auto fill"
                   className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
@@ -94,18 +185,29 @@ const Tasks = () => {
               <div className="mt-2">
                 <select
                   name="assignMember"
-                  required
+                  onChange={(e) => {
+                    getSelectedMember(e.target.value);
+                  }}
+                  defaultValue={"Unassigned"}
                   className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
                 >
-                  <option value="" className="hidden">
+                  <option value="Unassigned" className="hidden">
                     --Select Member--
                   </option>
-                  <option value="tahmid">
+                  {targetMembers &&
+                    targetMembers?.length > 0 &&
+                    targetMembers?.map((member, index) => (
+                      <option key={index} value={member?.name}>
+                        {member?.name}- Capacity {member?.capacity} - Current
+                        Tasks {member?.currentTask}
+                      </option>
+                    ))}
+                  {/* <option value="tahmid">
                     Tahmid (CurrentTasks: 3, Capacity: 5)
                   </option>
                   <option value="medha">
                     Medha (CurrentTasks: 7, Capacity: 5)
-                  </option>
+                  </option> */}
                 </select>
               </div>
             </div>
@@ -156,7 +258,13 @@ const Tasks = () => {
               </div>
             </div>
             <div className="mt-2">
-              <button className="action-btn">Add Task</button>
+              <button disabled={isLoading} className="action-btn">
+                {isLoading ? (
+                  <span class="loading loading-spinner loading-sm"></span>
+                ) : (
+                  "Add Task"
+                )}
+              </button>
             </div>
           </form>
         </div>
@@ -221,17 +329,25 @@ const Tasks = () => {
         />
       </div>
       {/* Warning assign popup */}
-      {isWarning && (
+      {isWarning && selectedMember?.name && (
         <div className="fixed left-0 top-0 h-screen w-full bg-[#00000056] flex items-center justify-center">
           <div className="p-4 rounded-md bg-white border border-slate-50 z-20">
             <h3 className="text-center text-lg font-semibold">
-              Riya has 4 tasks but capacity is 3.
+              {selectedMember?.name} has {selectedMember?.currentTask} tasks but
+              capacity is {selectedMember?.capacity}.
             </h3>
             <h3 className="text-center text-xl font-bold mt-2">
               Assign anyway?
             </h3>
             <div className="flex items-center gap-2 mt-5 justify-between">
-              <button className="action-btn bg-red-500">Assign Anyway</button>
+              <button
+                onClick={() => {
+                  addTask(dataFrom);
+                }}
+                className="action-btn bg-red-500"
+              >
+                Assign Anyway
+              </button>
               <button
                 onClick={() => setIsWarning(false)}
                 className="action-btn bg-orange-400"
@@ -239,7 +355,9 @@ const Tasks = () => {
                 Chose Another
               </button>
             </div>
-            <button className="action-btn mt-2">Auto Assign</button>
+            <button onClick={handleAutoAssign} className="action-btn mt-2">
+              Auto Assign
+            </button>
           </div>
         </div>
       )}

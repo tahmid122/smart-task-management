@@ -210,7 +210,7 @@ const Teams = () => {
               </div>
             </div>
             <div className="mt-2">
-              <button className="action-btn">
+              <button disabled={isLoading} className="action-btn">
                 {isLoading ? (
                   <span class="loading loading-spinner loading-sm"></span>
                 ) : (
