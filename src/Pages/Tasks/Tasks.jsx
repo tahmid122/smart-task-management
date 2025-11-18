@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FaTrash, FaXmark } from "react-icons/fa6";
 import TaskCard from "./TaskCard";
 import Swal from "sweetalert2";
@@ -6,8 +6,10 @@ import useProjects from "../../Hooks/useProjects";
 import useAxiosSecure from "../../Hooks/useAxiosSecure";
 import { getFormData } from "../../utils/getFormData";
 import toast from "react-hot-toast";
+import useTasks from "../../Hooks/useTasks";
 
 const Tasks = () => {
+  const { allTasks, setAllTasks, setToggle, staticAllTasks } = useTasks();
   const { axiosSecure } = useAxiosSecure();
   const [isLoading, setIsLoading] = useState(false);
   const [taskShow, setTaskShow] = useState(false);
@@ -16,11 +18,14 @@ const Tasks = () => {
   const [event, setEvent] = useState(null);
   const [isWarning, setIsWarning] = useState(false);
   const [targetTeam, setTargetTeam] = useState("");
+  const [allMembers, setAllMembers] = useState([]);
   const [targetMembers, setTargetMembers] = useState([]);
   const { allProjects } = useProjects();
   const [selectedTask, setSelectedTask] = useState({
     taskTitle: "",
+    taskDescription: "",
     taskPriority: "",
+    taskId: "",
   });
   const handleDelete = (id = 0) => {
     Swal.fire({
@@ -31,15 +36,41 @@ const Tasks = () => {
       confirmButtonColor: "#3085d6",
       cancelButtonColor: "#d33",
       confirmButtonText: "Yes, delete it!",
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        Swal.fire({
-          title: "Deleted!",
-          text: "Your file has been deleted.",
-          icon: "success",
-        });
+        try {
+          const { data } = await axiosSecure.delete(`/delete-task/${id}`);
+          if (data?.success) {
+            Swal.fire({
+              title: "Deleted!",
+              text: "Your file has been deleted.",
+              icon: "success",
+            });
+            setAllTasks(allTasks.filter((task) => task._id != id));
+          } else {
+            toast.error(data?.message);
+          }
+        } catch (error) {
+          console.log(error.message);
+        }
       }
     });
+  };
+  const handleStatusUpdate = async (id, status) => {
+    try {
+      const { data } = await axiosSecure.patch("/update-task-status", {
+        id,
+        status,
+      });
+      if (data?.success) {
+        toast.success(data?.message);
+      } else {
+        toast.error(data?.message);
+        console.log(data?.data);
+      }
+    } catch (error) {
+      console.log(error);
+    }
   };
   const handleGetTeam = (projectName) => {
     const filter = allProjects.find((project) => project.name === projectName);
@@ -108,11 +139,56 @@ const Tasks = () => {
     const leastLoad = sortArray[0]["name"];
     addTask({ ...dataFrom, assignMember: leastLoad });
   };
+  // handle task
+  const handleEditTask = (e) => {
+    const name = e.target.name;
+    const value = e.target.value;
+    setSelectedTask({ ...selectedTask, [name]: value });
+  };
+  // updateTask
+  const updateTask = async (e) => {
+    e.preventDefault();
+    try {
+      setIsLoading(true);
+      const { data } = await axiosSecure.put("/update-task", selectedTask);
+      if (data?.success) {
+        toast.success(data?.message);
+        setToggle((prev) => !prev);
+        setSelectedTask({
+          taskTitle: "",
+          taskDescription: "",
+          taskPriority: "",
+          taskId: "",
+        });
+      } else {
+        toast.error(data?.message);
+      }
+    } catch (error) {
+      setIsLoading(false);
+      console.log(error.message);
+    }
+  };
+  // filter all member
+  useEffect(() => {
+    const arr = staticAllTasks.map((task) => task.assignMember);
+    const uniqueArr = [...new Set(arr)];
+    setAllMembers(uniqueArr);
+  }, [staticAllTasks]);
+  // filter
+  const handleFilter = (e) => {
+    const value = e.target.value;
+    const filtered = staticAllTasks.filter(
+      (task) => task.project === value || task.assignMember === value
+    );
+    setAllTasks(filtered);
+  };
   return (
     <div>
       {/* top */}
       <div className="flex items-center flex-col gap-3 lg:flex-row justify-between border-b border-b-slate-200 pb-4 mb-10">
-        <h2 className="text-2xl font-semibold">Total Tasks (5)</h2>
+        <h2 className="text-2xl font-semibold">
+          Total Tasks ({allTasks?.length})
+        </h2>
         <div className="flex items-center gap-3">
           <div>
             <button
@@ -276,57 +352,68 @@ const Tasks = () => {
         <div>
           <select
             name="filterByProject"
+            onChange={handleFilter}
             required
             className="block rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
           >
             <option value="" className="hidden">
               Filter by project
             </option>
-            <option value="low">Project 1</option>
-            <option value="medium">Project 2</option>
+            {allProjects &&
+              allProjects?.length > 0 &&
+              allProjects?.map((project) => (
+                <option key={project?._id} value={project?.name}>
+                  {project?.name}
+                </option>
+              ))}
           </select>
         </div>
         <div>
           <select
             name="filterByMember"
+            onChange={handleFilter}
             required
             className="block rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
           >
             <option value="" className="hidden">
               Filter by Member
             </option>
-            <option value="low">Tahmid</option>
-            <option value="medium">Munchifa</option>
+            {allMembers &&
+              allMembers?.length > 0 &&
+              allMembers?.map((member, index) => (
+                <option key={index} value={member}>
+                  {member}
+                </option>
+              ))}
           </select>
+        </div>
+        <div>
+          <button
+            className="action-btn bg-orange-400"
+            onClick={() => {
+              setAllTasks(staticAllTasks);
+            }}
+          >
+            Reset
+          </button>
         </div>
       </div>
       {/* all tasks */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-10">
-        {/* single task */}
-        <TaskCard
-          setSelectedTask={setSelectedTask}
-          handleDelete={handleDelete}
-        />
-        {/* single task */}
-        <TaskCard
-          setSelectedTask={setSelectedTask}
-          handleDelete={handleDelete}
-        />
-        {/* single task */}
-        <TaskCard
-          setSelectedTask={setSelectedTask}
-          handleDelete={handleDelete}
-        />
-        {/* single task */}
-        <TaskCard
-          setSelectedTask={setSelectedTask}
-          handleDelete={handleDelete}
-        />
-        {/* single task */}
-        <TaskCard
-          setSelectedTask={setSelectedTask}
-          handleDelete={handleDelete}
-        />
+        {allTasks &&
+          allTasks.length > 0 &&
+          allTasks.map((task) => (
+            <TaskCard
+              key={task?._id}
+              setSelectedTask={setSelectedTask}
+              handleDelete={handleDelete}
+              handleStatusUpdate={handleStatusUpdate}
+              task={task}
+            />
+          ))}
+        {allTasks && allTasks?.length == 0 && (
+          <p className="text-xl font-semibold">0 Task found</p>
+        )}
       </div>
       {/* Warning assign popup */}
       {isWarning && selectedMember?.name && (
@@ -365,69 +452,23 @@ const Tasks = () => {
       {selectedTask && selectedTask?.taskTitle && (
         <div className="fixed top-0 left-0 w-full h-screen bg-[#00000054] flex items-center justify-center z-10">
           <div className="flex items-center justify-center">
-            <form className="w-[400px] shadow-md rounded-md p-5 border border-slate-200 space-y-2 bg-white relative">
+            <form
+              onSubmit={updateTask}
+              className="w-[400px] shadow-md rounded-md p-5 border border-slate-200 space-y-2 bg-white relative"
+            >
               <FaXmark
                 onClick={() => {
                   setSelectedTask({
                     taskTitle: "",
+                    taskDescription: "",
                     taskPriority: "",
+                    taskId: "",
                   });
                 }}
                 className="absolute right-2 top-2 cursor-pointer"
                 size={20}
               />
               <h3 className="text-center text-xl font-semibold">Edit Task</h3>
-              <div>
-                <label htmlFor="project" className="font-semibold">
-                  Select Project
-                </label>
-                <div className="mt-2">
-                  <select
-                    name="project"
-                    required
-                    className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
-                  >
-                    <option value="" className="hidden">
-                      --Select project--
-                    </option>
-                    <option value="ui/ux creation">UI/UX Creation</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label htmlFor="assignTeam" className="font-semibold">
-                  Assign Team
-                </label>
-                <div className="mt-2">
-                  <select
-                    name="assignTeam"
-                    required
-                    className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
-                  >
-                    <option value="" className="hidden">
-                      --Select Team--
-                    </option>
-                    <option value="alpha">Alpha Team</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label htmlFor="assignMember" className="font-semibold">
-                  Assign Member
-                </label>
-                <div className="mt-2">
-                  <select
-                    name="assignMember"
-                    required
-                    className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
-                  >
-                    <option value="" className="hidden">
-                      --Select Member--
-                    </option>
-                    <option value="tahmid">Tahmid</option>
-                  </select>
-                </div>
-              </div>
               <div>
                 <label htmlFor="taskTitle" className="font-semibold">
                   Task Title
@@ -436,6 +477,8 @@ const Tasks = () => {
                   <input
                     type="text"
                     name="taskTitle"
+                    value={selectedTask.taskTitle}
+                    onChange={handleEditTask}
                     required
                     placeholder="Enter task title"
                     className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
@@ -449,6 +492,8 @@ const Tasks = () => {
                 <div className="mt-2">
                   <textarea
                     name="taskDescription"
+                    value={selectedTask.taskDescription}
+                    onChange={handleEditTask}
                     placeholder="Enter task description"
                     className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6 h-[100px] resize-none"
                     required
@@ -462,6 +507,8 @@ const Tasks = () => {
                 <div className="mt-2">
                   <select
                     name="taskPriority"
+                    defaultValue={selectedTask.taskPriority}
+                    onChange={handleEditTask}
                     required
                     className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
                   >
@@ -475,7 +522,17 @@ const Tasks = () => {
                 </div>
               </div>
               <div className="mt-2">
-                <button className="action-btn">Update Task</button>
+                <button
+                  disabled={isLoading}
+                  type="submit"
+                  className="action-btn"
+                >
+                  {isLoading ? (
+                    <span class="loading loading-spinner loading-sm"></span>
+                  ) : (
+                    "Update TAsk"
+                  )}
+                </button>
               </div>
             </form>
           </div>
