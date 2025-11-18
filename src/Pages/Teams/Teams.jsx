@@ -1,23 +1,73 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import useAxiosSecure from "../../Hooks/useAxiosSecure";
+import useAuth from "../../Hooks/useAuth";
+import toast from "react-hot-toast";
+import TeamTable from "./TeamTable";
 
 const Teams = () => {
+  const { user } = useAuth();
+  const [allTeams, setAllTeams] = useState([]);
   const { axiosSecure } = useAxiosSecure();
   const [showCreateTeam, setCreateTeam] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
-  const [team, setTeam] = useState({ teamName: "" });
+  const [team, setTeam] = useState({ teamName: "", createdBy: user?.email });
+  const [isLoading, setIsLoading] = useState(false);
   // create team
   const createTeam = async (e) => {
     e.preventDefault();
     try {
-      const { data } = await axiosSecure.post("/create-team", {
-        teamName: team?.teamName,
-      });
-      console.log(data);
+      setIsLoading(true);
+      const { data } = await axiosSecure.post("/create-team", team);
+      if (data?.success) {
+        toast.success(data?.message);
+        setTeam({ teamName: "", createdBy: "" });
+        getAllTeams();
+      } else {
+        toast.error(data?.message);
+        if (data?.error) console.log(data?.error);
+      }
+    } catch (error) {
+      console.log(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  // get all teams
+  const getAllTeams = useCallback(async () => {
+    try {
+      const { data } = await axiosSecure.get(`/teams/${user.email}`);
+      setAllTeams(data?.data);
     } catch (error) {
       console.log(error.message);
     }
+  }, [axiosSecure, user]);
+  useEffect(() => {
+    getAllTeams();
+  }, [getAllTeams]);
+
+  // add member to team
+  const handleAddMember = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const expectData = Object.fromEntries(formData.entries());
+    try {
+      setIsLoading(true);
+      const { data } = await axiosSecure.post("/add-member", expectData);
+      if (data?.success) {
+        toast.success(data?.message);
+        getAllTeams();
+      } else {
+        toast.error(data?.message);
+        if (data?.error) console.log(data?.error);
+      }
+    } catch (error) {
+      console.log(error.message);
+    } finally {
+      setIsLoading(false);
+      e.target.reset();
+    }
   };
+  console.log(allTeams);
   return (
     <div>
       {/* top */}
@@ -75,7 +125,13 @@ const Teams = () => {
               </div>
             </div>
             <div className="mt-2">
-              <button className="action-btn">Create Team</button>
+              <button className="action-btn">
+                {isLoading ? (
+                  <span class="loading loading-spinner loading-sm"></span>
+                ) : (
+                  "Create Team"
+                )}
+              </button>
             </div>
           </form>
         </div>
@@ -83,7 +139,10 @@ const Teams = () => {
       {/* modal for add member*/}
       {showAddMember && (
         <div className="flex items-center justify-center">
-          <form className="w-[400px] shadow-md rounded-md p-5 border border-slate-200 space-y-2">
+          <form
+            onSubmit={handleAddMember}
+            className="w-[400px] shadow-md rounded-md p-5 border border-slate-200 space-y-2"
+          >
             <h3 className="text-center text-xl font-semibold">Add Member</h3>
             <div>
               <label htmlFor="memberName" className="font-semibold">
@@ -140,13 +199,24 @@ const Teams = () => {
                   <option value="" className="hidden">
                     --Select Team--
                   </option>
-                  <option value="alpha">Alpha Team</option>
-                  <option value="beta">Beta Team</option>
+                  {allTeams &&
+                    allTeams?.length > 0 &&
+                    allTeams?.map((team) => (
+                      <option key={team?._id} value={team?._id}>
+                        {team?.teamName}
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>
             <div className="mt-2">
-              <button className="action-btn">Add Member</button>
+              <button className="action-btn">
+                {isLoading ? (
+                  <span class="loading loading-spinner loading-sm"></span>
+                ) : (
+                  "Add Member"
+                )}
+              </button>
             </div>
           </form>
         </div>
@@ -154,74 +224,9 @@ const Teams = () => {
 
       {/* main */}
       <div className="space-y-10">
-        {/* single team */}
-        <div>
-          <h2 className="text-xl font-bold">Team Alpha</h2>
-          <div className="overflow-x-auto mt-5 rounded-box border border-base-content/5 bg-base-100">
-            <table className="table">
-              {/* head */}
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Role</th>
-                  <th>Capacity</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* row 1 */}
-                <tr>
-                  <td>Cy Ganderton</td>
-                  <td>User</td>
-                  <td>5</td>
-                </tr>
-                <tr>
-                  <td>Cy Ganderton</td>
-                  <td>User</td>
-                  <td>5</td>
-                </tr>
-                <tr>
-                  <td>Cy Ganderton</td>
-                  <td>User</td>
-                  <td>5</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {/* single team */}
-        <div>
-          <h2 className="text-xl font-bold">Team Alpha</h2>
-          <div className="overflow-x-auto mt-5 rounded-box border border-base-content/5 bg-base-100">
-            <table className="table">
-              {/* head */}
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Role</th>
-                  <th>Capacity</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* row 1 */}
-                <tr>
-                  <td>Cy Ganderton</td>
-                  <td>User</td>
-                  <td>5</td>
-                </tr>
-                <tr>
-                  <td>Cy Ganderton</td>
-                  <td>User</td>
-                  <td>5</td>
-                </tr>
-                <tr>
-                  <td>Cy Ganderton</td>
-                  <td>User</td>
-                  <td>5</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+        {allTeams &&
+          allTeams?.length > 0 &&
+          allTeams.map((team) => <TeamTable key={team?._id} team={team} />)}
       </div>
     </div>
   );
